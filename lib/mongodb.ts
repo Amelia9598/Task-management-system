@@ -1,14 +1,9 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL;
+const MONGODB_URI = process.env.MONGODB_URI!;
 
 if (!MONGODB_URI) {
-  throw new Error(
-    "Please define the MONGODB_URI or DATABASE_URL environment variable inside .env.local"
-  );
-}
-else{
-  console.log("Database Connected");
+  throw new Error("Please define MONGODB_URI");
 }
 
 interface MongooseCache {
@@ -17,39 +12,30 @@ interface MongooseCache {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
-  var mongoose: MongooseCache | undefined;
+  var mongooseCache: MongooseCache | undefined;
 }
 
-const cached: MongooseCache = global.mongoose || { conn: null, promise: null };
+let cached = global.mongooseCache;
 
-if (!global.mongoose) {
-  global.mongoose = cached;
+if (!cached) {
+  cached = global.mongooseCache = {
+    conn: null,
+    promise: null,
+  };
 }
 
-async function dbConnect(): Promise<typeof mongoose> {
-  if (cached.conn) {
+async function connectDB() {
+  if (cached?.conn) {
     return cached.conn;
   }
 
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
-      return mongoose;
-    });
+  if (!cached?.promise) {
+    cached!.promise = mongoose.connect(MONGODB_URI);
   }
 
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    throw e;
-  }
+  cached!.conn = await cached!.promise;
 
-  return cached.conn;
+  return cached!.conn;
 }
 
-export default dbConnect;
+export default connectDB;
